@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+    <script src="js/processing.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+
+    <title>Simulação Ondas</title>
+</head>
+
+<body>
+
+    <h1>Simulação Ondas</h1>
+    <div class="wrap">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script type="text/javascript" src="js/custom.js"></script>
+
+    <script>
+        var canvas = document.getElementById("canvas");
+        var p = new Processing(canvas, main);
+    </script>
+
+</body>
+
+</html>
