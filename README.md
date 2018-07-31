@@ -1,2 +1,0 @@
-# Simulacao-Onda
-Estudando javascript
