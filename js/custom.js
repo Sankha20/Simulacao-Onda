@@ -20,7 +20,7 @@ function main(p) {
 
     class Bar {
         constructor(x) {
-            thPis.id = 0;
+            this.id = 0;
             this.pos = new PVector(x, p.height);
             this.h = WATER_LEVEL;
             this.w = BAR_WIDTH;
@@ -293,7 +293,6 @@ function main(p) {
 
 
         p.color(255);
-        p.text("FPS: " + p.frameRate, 10, 10);
     };
 
     p.mouseClicked = function () {
