@@ -5,43 +5,78 @@ function main(p) {
         p.frameRate(60);
     }
 
-    var BAR_WIDTH = 5;
+    var WAVE_WIDTH = 5;
     var WATER_LEVEL = 200;
- 
-    var bars = [];
-    var bars2 = [];
-    var balls = [];
+
+    var wavesArray = [];
+    var bgWavesArray = [];
+    var ballsArray = [];
 
     var ballMass = 1;
 
     var ballTimer = 0;
     var ballRecoveryTime = 90;
 
+    // Funções globais
+    /**
+     * Limita um determinado valor entre o Min e o Max
+     * @param {Number} val Valor a ser limitado
+     * @param {Number} min Valor minimo
+     * @param {Number} max Valor máximo
+     */
+    function constrain(val, min, max) {
+        if (val < min)
+            val = min;
+        else if (val > max)
+            val = max;
 
-    class Bar {
+        return val;
+    }
+
+    constrain
+
+
+    /**
+     * Classe que define as "particulas" das ondas
+     */
+    class WaveParticle {
         constructor(x) {
             this.id = 0;
+
+            // Posicionamento
             this.pos = new PVector(x, p.height);
-            this.h = WATER_LEVEL;
-            this.w = BAR_WIDTH;
+            this.height = WATER_LEVEL;
+            this.width = WAVE_WIDTH;
+
+            // Estilo
             this.bgColor = p.color(20, 113, 227);
             this.isBackground = false;
-            this.forceDecay = 0.9;
-            this.friction = 0.003;
+            
+            // Contadores de tempo
             this.counter = 0;
             this.counting = false;
+
+            // Impacto de particulas ao lado
             this.spreading = false;
             this.nid = this.id + 1;
             this.pid = this.id - 1;
+
+            // Movimentação
+            this.friction = 0.003;
             this.acceleration = 0;
             this.lastAcceleration = 0;
             this.velocity = 0;
         }
 
+        /**
+         * Desenha a partícula na tela
+         */
         draw() {
             p.fill(this.bgColor);
             p.noStroke();
-            var posY = -this.h;
+            var posY = -this.height;
+
+            // Se esta onda faz parte do background
             if (this.isBackground) {
                 if (this.id > 60) {
                     posY += p.cos(this.counter + this.id * 6.1) * 5;
@@ -49,9 +84,14 @@ function main(p) {
                     posY += p.cos(this.counter + this.id * 6.2) * 5;
                 }
             }
-            p.rect(this.pos.x, this.pos.y, this.w, posY);
+
+            p.rect(this.pos.x, this.pos.y, this.width, posY);
         }
 
+        /**
+         * Aplica determinada força à partícula
+         * @param {number} f Intensidade da força
+         */
         applyForce(f) {
             this.acceleration += f;
             this.lastAcceleration = f;
@@ -61,25 +101,36 @@ function main(p) {
             this.pid = this.id - 1;
         }
 
+        /**
+         * Inicia o movimento das partículas
+         */
         setMotion() {
             this.velocity += this.acceleration;
-            this.h += -this.velocity * p.cos(this.counter * 2);
+            this.height += -this.velocity * p.cos(this.counter * 2);
             this.acceleration = 0;
         }
 
+        /**
+         * Espalha a força do impacto da bola para as partículas do lado.
+         * A força perde intensidade pouco a pouco.
+         */
         spread() {
             this.lastAcceleration *= 0.999;
+
             var f = this.lastAcceleration;
+
+            // Verificam se a onda está muito fraca para parar de espalhar a força
             var a = false;
             var b = false;
+
             if (this.counter % 4 < this.lastAcceleration * 3) {
-                if (this.nid < bars.length) {
-                    bars[this.nid++].applyForce(f);
+                if (this.nid < wavesArray.length) {
+                    wavesArray[this.nid++].applyForce(f);
                 } else {
                     a = true;
                 }
                 if (this.pid >= 0) {
-                    bars[this.pid--].applyForce(f);
+                    wavesArray[this.pid--].applyForce(f);
                 } else {
                     b = true;
                 }
@@ -89,24 +140,30 @@ function main(p) {
             }
         }
 
+        /**
+         * Aplica força contrária ao movimento para "frear" as ondas
+         */
         applyFriction() {
             this.velocity += -this.velocity * this.friction;
         }
 
+        /**
+         * Função principal que controla todas as outras
+         */
         run() {
             this.draw();
             this.counter += 0.02;
             if (this.counting) {
                 this.setMotion();
                 this.applyFriction();
-                if (this.h < WATER_LEVEL) {
-                    this.h += 0.1;
-                } else if (this.h > WATER_LEVEL) {
-                    this.h -= 0.1;
+                if (this.height < WATER_LEVEL) {
+                    this.height += 0.1;
+                } else if (this.height > WATER_LEVEL) {
+                    this.height -= 0.1;
                 }
                 if (this.velocity < 0.05) {
-                    if (p.abs(this.h - WATER_LEVEL) < 2) {
-                        this.h = WATER_LEVEL;
+                    if (p.abs(this.height - WATER_LEVEL) < 2) {
+                        this.height = WATER_LEVEL;
                         this.velocity = 0;
                         this.counting = false;
                     }
@@ -121,41 +178,64 @@ function main(p) {
         }
     }
 
-
+    /**
+     * Classe dos objetos que interagem com a água
+     */
     class Ball {
-        constructor(x, y, m) {
-            this.pos = new PVector(x, y);
-            this.m = m || 1;
+        constructor(x, y, mass) {
             this.barId = -1;
-            this.Size = 15 + this.m * 5;
-            this.inLiquid = false;
+
+            // Posicionamento
+            this.pos = new p.PVector(x, y);
             this.enteredLiquid = false;
+            this.inLiquid = false;
+            this.firstContact = true;
+            this.mass = mass || 1;
+
+            // Estilo
+            this.Size = 15 + this.mass * 5;
+            
+            // Movimentação
             this.friction = 0.001;
             this.maxVelocity = 6;
             this.acceleration = 0;
             this.velocity = 0;
-            this.firstContact = true;
-            balls.push(this);
+
+            ballsArray.push(this);
         }
+
+        /**
+         * Movimenta o objeto
+         */
         move() {
             this.velocity += this.acceleration;
-            if (this.velocity > this.maxVelocity) {
-                this.velocity = this.maxVelocity;
-            } else if (this.velocity < -this.maxVelocity) {
-                this.velocity = -this.maxVelocity;
-            }
+
+            this.velocity = constrain(
+                this.velocity, -this.maxVelocity, this.maxVelocity);
+
             this.pos.y += this.velocity;
             this.acceleration = 0;
         }
+
+        /**
+         * Aplica força contrária ao movimento
+         */
         applyFriction() {
             this.velocity += -this.velocity * this.friction;
         }
 
+        /**
+         * Desenha o objeto na tela
+         */
         draw() {
             p.fill(255, 0, 0);
             p.ellipse(this.pos.x, this.pos.y, this.Size, this.Size);
         }
 
+        /**
+         * Aplica determinada força à partícula
+         * @param {number} f Intensidade da força
+         */
         applyForce(f) {
             if (this.inLiquid) {
                 f = f / 3;
@@ -163,16 +243,21 @@ function main(p) {
             this.acceleration = f;
         }
 
+        /**
+         * Verifica colisão com a água
+         */
         checkCollision() {
             if (this.firstContact) {
-                for (var i = 0; i < bars.length; i++) {
-                    if (this.pos.y + this.Size / 2 > p.height - bars[i].h) {
-                        if (this.pos.x <= bars[i].pos.x + BAR_WIDTH &&
-                            this.pos.x >= bars[i].pos.x) {
+                for (var i = 0; i < wavesArray.length; i++) {
+                    if (this.pos.y + this.Size / 2 > p.height - wavesArray[i].height) {
+                        if (this.pos.x <= wavesArray[i].pos.x + WAVE_WIDTH &&
+                            this.pos.x >= wavesArray[i].pos.x) {
+
+                                // Se colidiu, aplicar força
                             this.inLiquid = true;
-                            bars[i].applyForce(this.m);
-                            bars[i].spread();
-                            bars[i].spreading = true;
+                            wavesArray[i].applyForce(this.mass);
+                            wavesArray[i].spread();
+                            wavesArray[i].spreading = true;
                             this.barId = i;
                             break;
                         }
@@ -181,22 +266,28 @@ function main(p) {
             }
         }
 
+        /**
+         * Faz o objeto boiar na água.
+         */
         float() {
-            if (p.abs(this.pos.y - (p.height - bars[this.barId].h)) < 3) {
+            if (p.abs(this.pos.y - (p.height - wavesArray[this.barId].height)) < 3) {
                 if (p.abs(this.velocity) < 1 &&
                     this.velocity < 0) {
-                    this.pos.y = p.height - bars[this.barId].h;
+                    this.pos.y = p.height - wavesArray[this.barId].height;
                 }
             }
         }
 
+        /**
+         * Função principal que controla todas as outras
+         */
         run() {
             if (this.pos.y < p.height + this.Size) {
                 this.draw();
                 if (!this.inLiquid) {
                     this.checkCollision();
                 } else {
-                    this.float();
+                    //this.float();
                     if (!this.enteredLiquid) {
                         this.enteredLiquid = true;
                         this.friction = 0.05;
@@ -212,21 +303,26 @@ function main(p) {
         }
     }
 
-    for (var i = 0; i < p.width / BAR_WIDTH; i++) {
-        var aux = new Bar(i * BAR_WIDTH);
-        var aux2 = new Bar(i * BAR_WIDTH);
+    /**
+     * Preenche as arrays das ondas
+     * aux = ondas da frente, que interagem
+     * aux2 = ondas de trás, plano de fundo
+     */
+    for (var i = 0; i < p.width / WAVE_WIDTH; i++) {
+        var aux = new WaveParticle(i * WAVE_WIDTH);
+        var aux2 = new WaveParticle(i * WAVE_WIDTH);
 
         aux2.id = i;
         aux2.bgColor = p.color(2, 89, 194);
         aux2.isBackground = true;
         aux.id = i;
-        bars.push(aux);
-        bars2.push(aux2);
+
+        wavesArray.push(aux);
+        bgWavesArray.push(aux2);
     }
 
     var shipImage = p.loadImage("barco.png");
     var barInd = 30;
-
 
     var gravity = 0.1;
 
@@ -264,37 +360,38 @@ function main(p) {
         p.ellipse(rightX + 62, 100, 70, 60);
         p.ellipse(rightX - 62, 100, 70, 60);
 
-        // AGUA
 
+        // Contador da bola
         if (ballTimer > 0) {
             ballTimer--;
         }
 
-        for (var i = 0; i < bars.length; i++) {
-            bars2[i].run();
-            bars[i].run();
+        // Faz funcionar as ondas
+        for (var i = 0; i < wavesArray.length; i++) {
+            bgWavesArray[i].run();
+            wavesArray[i].run();
         }
 
-        for (var i = balls.length - 1; i >= 0; i--) {
-            var ball = balls[i];
+        // Faz funcionar as bolas
+        for (var i = ballsArray.length - 1; i >= 0; i--) {
+            var ball = ballsArray[i];
             ball.applyForce(gravity);
             ball.run();
             if (ball.isDead) {
-                balls.splice(i, 1);
+                ballsArray.splice(i, 1);
             }
         }
 
-        p.pushMatrix();        
+        // Desenha o barco na tela
+        p.pushMatrix();
         p.imageMode(p.CENTER);
         p.image(shipImage,
-            bars[barInd].pos.x, p.height - bars[barInd].h,
-        50, 50);
+            wavesArray[barInd].pos.x, p.height - wavesArray[barInd].height,
+            70, 70);
         p.popMatrix();
-
-
-        p.color(255);
     };
 
+    // Verifica interação com o mouse
     p.mouseClicked = function () {
         if (p.mouseButton !== p.LEFT) {
             return;
@@ -306,6 +403,7 @@ function main(p) {
         }
     };
 
+    // Verifica interação com o teclado
     p.keyPressed = function () {
         var val = p.keyCode - 48;
         if (val > 0 && val < 6) {
